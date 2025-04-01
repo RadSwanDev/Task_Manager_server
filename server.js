@@ -78,6 +78,7 @@ app.post("/login",(req,res)=>{
                 username : user.username,
                 email : user.email
             },process.env.SECRET_KEY,{expiresIn : "24h"})
+           
             res.send({
                 token : token
             })
