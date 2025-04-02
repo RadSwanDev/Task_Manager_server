@@ -1,5 +1,4 @@
 const express = require("express")
-const bodyParser = require("body-parser")
 const app = express()
 const jwt = require("jsonwebtoken")
 const port = 3000
@@ -7,7 +6,7 @@ const db = require("./db/db")
 const bcrypt = require("bcryptjs")
 require("dotenv").config()
 
-app.use(bodyParser.json())
+app.use(express.json())
 
 app.get("/",(req,res)=>{
     try{
@@ -95,18 +94,66 @@ const authenticationValidation = (req,res,next)=>{
     }
 
     const token = autHeader.split(" ")[1];
-    try{
         const decode = jwt.verify(token,process.env.SECRET_KEY)
         req.user = decode;
         next()
-    }catch(error){
-        return res.status(401).send({message : "Unauthorized"})
-    }
 }
 
 app.get("/dashboard",authenticationValidation,(req,res)=>{
-    res.send({message : `hello ${req.user.username}, welcome back!`})
+    const userId = req.user.id
+    db.query(`
+        SELECT tasks.id, tasks.title, tasks.description, tasks.status, tasks.created_at, tasks.updated_at FROM tasks JOIN authentication ON tasks.user_id = authentication.id WHERE authentication.id = ? `,[userId],
+    (error,result)=>{
+        if(error){
+            return res.status(400).send({message : "Failed to fetch tasks",error})
+        }
+        return res.status(200).send({message : "success fetching data",data : result})
+    })
 })
+
+app.post("/dashboard/add",authenticationValidation,(req,res)=>{
+    const userId = req.user.id;
+    const {title,description,status} = req.body
+    const created_at = new Date();
+    const updated_at = new Date();
+
+    db.query(`
+        INSERT INTO tasks(title,description,status,created_at,updated_at,user_id) VALUES (?, ?, ?, ?, ?,?)
+        `,[title,description,status,created_at,updated_at,userId],(error,result) =>{
+            if(error){
+                return res.status(400).send({message : "Failed to add task",error:error})
+            }
+            return res.status(201).send({
+                message : "Task successfully added!",
+                data : {
+                    id : result.insertId,
+                    title, 
+                    description,
+                    status,
+                    created_at,
+                    updated_at,
+                    user_id : userId
+                }
+            })
+        }
+
+    )
+ })
+
+ app.delete("/dashboard/delete",authenticationValidation,(req,res)=>{
+    const userId = req.user.id
+    const {id} = req.body
+
+    db.query('DELETE FROM tasks WHERE id = ? AND user_id = ?',[id,userId],(error,result)=>{
+        if(error){
+            return res.status(400).send({message : "Failed to delete task"})
+        }
+        if(result.affectedRows === 0){
+            return res.status(404).send({message : "Task not found!"})
+        }
+        return res.status(200).send({message : "Tasks successfully deleted"})
+    })
+ })
 
 app.listen(port,()=>{
     console.log(`http://localhost:${port}`)
