@@ -215,6 +215,42 @@ app.post("/dashboard/add",authenticationValidation,(req,res)=>{
     })
  })
 
+
+app.get("/dashboard/profile",authenticationValidation,(req,res)=>{
+    const userId = req.user.id
+    db.query("SELECT * FROM profile WHERE user_id = ?",[userId],(error,result)=>{
+        if(error){
+            return res.status(400).send({error})
+        }
+
+        if(result){
+            return res.status(200).send({
+                message : "data find!",
+                result  
+            })
+        }
+    })
+})
+
+app.post("/dashboard/profile",authenticationValidation,(req,res)=>{
+    const {telepon,tanggalLahir,jenisKelamin,fotoProfile} = req.body;
+    const userId = req.user.id 
+    db.query("UPDATE profile SET telepon =?,tanggal_lahir = ?,jenis_kelamin = ?,foto_profile = ? WHERE user_id = ?",
+        [telepon,tanggalLahir,jenisKelamin,fotoProfile,userId],(error,result)=>{
+            if(error){
+                return res.status(400).send({
+                    message : "Failed to update profile!",
+                    error
+                })
+            }
+            return res.status(200).send({
+                message : "Success update the data",
+                result
+            })
+        }
+     )
+})
+
  app.post("/logout",(req,res)=>{
     res.clearCookie("token",{
         httpOnly : true,
