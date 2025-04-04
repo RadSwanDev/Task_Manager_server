@@ -6,14 +6,175 @@ const db = require("./db/db")
 const bcrypt = require("bcryptjs")
 const cors = require("cors")
 const cookieParser = require("cookie-parser")
+const {google} = require("googleapis")
+
+// OauthConfiguration
+const oauth2Client = new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID, 
+    process.env.GOOGLE_CLIENT_SECRET,
+    "http://localhost:3000/auth/google/callback"
+)
+
+
+const scopes = [
+    "https://www.googleapis.com/auth/userinfo.email",
+    "https://www.googleapis.com/auth/userinfo.profile"
+]
+
+
+const authorizaionURL = oauth2Client.generateAuthUrl({
+    access_type : "offline",
+    scope : scopes,
+    include_granted_scopes : true
+})
+
+
+app.get("/auth/google",(req,res)=>{
+    res.redirect(authorizaionURL)
+})
+
+app.get("/auth/google/callback",async (req,res)=>{
+    try{
+    const {code} = req.query
+
+    const {tokens} = await oauth2Client.getToken(code)
+    oauth2Client.setCredentials(tokens)
+
+    const oauth2 = google.oauth2({
+        auth : oauth2Client,
+        version : "v2",
+    })
+
+    const {data} = await oauth2.userinfo.get();
+    if(!data || !data.email){
+        return express.json({
+            data : data,
+        })
+    }
+    const email = data.email;
+    const username = data.name
+    
+    db.query("SELECT * FROM authentication WHERE email = ?",[email],async(error,results)=>{
+        if(error){
+            return res.status(500).send({message : "Database error",error : error})
+        }
+
+        let user
+        if(results.length === 0){
+            user = db.query("INSERT INTO authentication (username, email,password) VALUES (?, ?,?)",
+            [username,email,""],
+            (insertError,insertResult)=>{
+                if(insertError){
+                    return res.status(500).send({message : "Failed to insert account"})
+                }
+            
+            user ={
+                id : insertResult.insertId,
+                username,
+                email
+            }
+            
+            const token = jwt.sign(user, process.env.SECRET_KEY,{expiresIn :"24h" })
+
+            res.cookie("token",token,{
+                httpOnly : true,
+                maxAge : 24 * 60 * 60 * 1000,
+                secure : false,
+                sameSite : "strict"          
+             })
+            return res.redirect("http://localhost:5173/dashboard")
+            }
+            )
+        }else{
+            user = results[0]
+            const token = jwt.sign({
+                id : user.id,
+                username : user.username,
+                email : user.email,
+            },process.env.SECRET_KEY, {expiresIn : "24h"})
+            
+            res.cookie("token",token,{
+                httpOnly : true,
+                maxAge: 24 * 60 * 60 * 1000,
+                secure : false,
+                sameSite : "strict"
+            })
+            return res.redirect("http://localhost:5173/dashboard")
+        }
+    })
+    }catch(error){
+        return res.status(500).send({message : "Internal server error",error})
+    }
+})
+
+
 app.use(cors({
     origin: 'http://localhost:5173',
     credentials : true
 }))
+const session = require("express-session")
+const passport = require("passport")
+const GoogleStrategy = require("passport-google-oauth20").Strategy
 require("dotenv").config()
 
+// middleware
 app.use(express.json())
 app.use(cookieParser())
+
+app.use(session({
+    secret : process.env.SECRET_KEY,
+    resave : false,
+    saveUninitialized : true
+}))
+
+app.use(passport.initialize())
+app.use(passport.session())
+
+
+passport.use(new GoogleStrategy({
+    clientID : process.env.GOOGLE_CLIENT_ID,
+    clientSecret : process.env.GOOGLE_CLIENT_SECRET,
+    callbackURL : "http://localhost:3000/auth/google/callback",
+    scope : ["email","profile"]
+},(accessToken,refreshToken,profile,done)=>{
+
+    if(!profile.emails || profile.emails.length === 0){
+        return done(new Error("Google account dosent exist"))
+    } 
+    const email = profile.emails[0].value;
+    const username = profile.displayName;
+
+
+
+    db.query("SELECT * FROM authentication WHERE email = ?",[email],(error,result)=>{
+        if(error){
+            return done(error)
+        }
+
+        if(result.length === 0){
+            db.query("INSERT INTO authentication (username,email,password) VALUES (?, ?, ?)",
+                [username,email,""],
+                (error,result)=>{
+                    if(error){
+                        return done(error)
+                    }
+
+                    const newUser = {
+                        id : result.insertId,
+                        username,
+                        email
+                    }
+                    return done(null,newUser)
+                }
+            )
+        }else{
+            return done(null,result[0])
+        }
+    })
+}))
+
+
+// route
 app.get("/",(req,res)=>{
     try{
         db.query("SELECT * FROM authentication",(error,result)=>{
@@ -250,6 +411,7 @@ app.post("/dashboard/profile",authenticationValidation,(req,res)=>{
         }
      )
 })
+
 
  app.post("/logout",(req,res)=>{
     res.clearCookie("token",{
