@@ -114,7 +114,6 @@ app.use(cors({
 }))
 const session = require("express-session")
 const passport = require("passport")
-const GoogleStrategy = require("passport-google-oauth20").Strategy
 require("dotenv").config()
 
 // middleware
@@ -125,52 +124,6 @@ app.use(session({
     secret : process.env.SECRET_KEY,
     resave : false,
     saveUninitialized : true
-}))
-
-app.use(passport.initialize())
-app.use(passport.session())
-
-
-passport.use(new GoogleStrategy({
-    clientID : process.env.GOOGLE_CLIENT_ID,
-    clientSecret : process.env.GOOGLE_CLIENT_SECRET,
-    callbackURL : "http://localhost:3000/auth/google/callback",
-    scope : ["email","profile"]
-},(accessToken,refreshToken,profile,done)=>{
-
-    if(!profile.emails || profile.emails.length === 0){
-        return done(new Error("Google account dosent exist"))
-    } 
-    const email = profile.emails[0].value;
-    const username = profile.displayName;
-
-
-
-    db.query("SELECT * FROM authentication WHERE email = ?",[email],(error,result)=>{
-        if(error){
-            return done(error)
-        }
-
-        if(result.length === 0){
-            db.query("INSERT INTO authentication (username,email,password) VALUES (?, ?, ?)",
-                [username,email,""],
-                (error,result)=>{
-                    if(error){
-                        return done(error)
-                    }
-
-                    const newUser = {
-                        id : result.insertId,
-                        username,
-                        email
-                    }
-                    return done(null,newUser)
-                }
-            )
-        }else{
-            return done(null,result[0])
-        }
-    })
 }))
 
 
