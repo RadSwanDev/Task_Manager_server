@@ -314,10 +314,35 @@ app.post("/dashboard/add",authenticationValidation,(req,res)=>{
     )
  })
 
- app.delete("/dashboard/delete",authenticationValidation,(req,res)=>{
-    const userId = req.user.id
-    const {id} = req.body
+ app.get("/dashboard/task/:id",authenticationValidation,(req,res)=>{
+    const id = req.params.id
+    const useId = req.user.id
+    db.query("SELECT * FROM tasks WHERE id = ? AND user_id = ?",[id,useId],(error,results)=>{
+        if(error){
+            return res.status(500).send({message : "Internal server error please contact developer and try again"})
+        }
 
+        return res.status(200).send({message : "success fetching data",results : results[0]})
+    })
+ })
+
+ app.put("/dashboard/edit/:id",authenticationValidation,(req,res)=>{
+    const id = req.params.id
+    const {title,description,status} = req.body;
+    const updatedAt = new Date()
+    const userId = req.user.id
+    db.query("UPDATE tasks SET title = ?, description = ?, status = ?, updated_at = ? WHERE id = ? AND user_id = ?",[title,description,status,updatedAt,id,userId],(error,result)=>{
+        if(error){
+            console.error("Error Updating Data",error)
+            return res.status(500).send({message : "Failed to updated task"})
+        }
+        return res.status(200).send({message : "Task updated successfully",data:result})
+    })
+ })
+
+ app.delete("/dashboard/delete/:id",authenticationValidation,(req,res)=>{
+    const userId = req.user.id
+    const id = req.params.id
     db.query('DELETE FROM tasks WHERE id = ? AND user_id = ?',[id,userId],(error,result)=>{
         if(error){
             return res.status(400).send({message : "Failed to delete task"})
