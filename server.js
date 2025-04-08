@@ -272,6 +272,9 @@ const authenticationValidation = (req,res,next)=>{
 
 }
 
+
+
+
 app.get("/dashboard",authenticationValidation,(req,res)=>{
     res.header("Access-Control-Allow-Origin",'http://localhost:5173')
     const userId = req.user.id
@@ -322,7 +325,7 @@ app.post("/dashboard/add",authenticationValidation,(req,res)=>{
             return res.status(500).send({message : "Internal server error please contact developer and try again"})
         }
 
-        return res.status(200).send({message : "success fetching data",results : results[0]})
+        return res.status(200).send({message : "success fetching data",data : results})
     })
  })
 
@@ -331,14 +334,74 @@ app.post("/dashboard/add",authenticationValidation,(req,res)=>{
     const {title,description,status} = req.body;
     const updatedAt = new Date()
     const userId = req.user.id
-    db.query("UPDATE tasks SET title = ?, description = ?, status = ?, updated_at = ? WHERE id = ? AND user_id = ?",[title,description,status,updatedAt,id,userId],(error,result)=>{
+    db.query("UPDATE tasks SET title = ?, description = ?, status = ?, updated_at = ? WHERE id = ? AND user_id = ?",[title,description,status,updatedAt,id,userId],(error,results)=>{
         if(error){
             console.error("Error Updating Data",error)
             return res.status(500).send({message : "Failed to updated task"})
         }
-        return res.status(200).send({message : "Task updated successfully",data:result})
+        return res.status(200).send({message : "Task updated successfully",data : results})
     })
  })
+
+app.patch("/dashboard/task/status/in-progress/:id",authenticationValidation,(req,res)=>{
+    try{
+
+
+    const id = req.params.id
+    const status ='in-progress'
+
+    const updateAt = new Date()
+    const userId = req.user.id
+    db.query("UPDATE tasks SET status = ?, updated_at = ? WHERE id = ? AND user_id = ?",[status,updateAt,id,userId],(error,results)=>{
+        if(error){
+            return res.status(500).send({message : "Error change status!",error})
+        }
+
+        return res.status(200).send({message : "Success change status!",results : results})
+    })
+    }catch(error){
+        return res.status(500).send({message : "failed change the status!",error})
+    }
+})
+
+app.patch("/dashboard/task/status/success/:id",authenticationValidation,(req,res)=>{
+    try{
+        const status = 'completed'
+        const id = req.params.id
+    
+        const updateAt = new Date()
+        const userId = req.user.id
+        db.query("UPDATE tasks SET status = ?, updated_at = ?  WHERE id = ?  AND user_id = ?",[status,updateAt,id,userId],(error,results)=>{
+            if(error){
+                return res.status(500).send({message: "Error change status!",error})
+            }
+            return res.status(200).send({message : "success change status",results : results})
+        })
+    
+    }catch(error){
+        return res.status(500).send({message : "failed change the status!",error})
+    }
+})
+
+app.patch("/dashboard/task/status/pending/:id",authenticationValidation,(req,res)=>{
+   try{
+    const id = req.params.id
+    const userId = req.user.id
+    const status = "pending"
+    const updateAt = new Date()
+
+    db.query("UPDATE tasks SET status = ?, updated_at = ? WHERE id = ? AND user_id = ?",[status,updateAt,id,userId],(error,results)=>{
+        if(error){
+            return res.status(202).send({message : "failed to change the status",error})
+        }
+
+        return res.status(200).send({message : "Success to change the status", data : results})
+    })
+   }catch(error){
+    return res.status(500).send({message : "Error change the status",error})
+   }
+})
+
 
  app.delete("/dashboard/delete/:id",authenticationValidation,(req,res)=>{
     const userId = req.user.id
