@@ -2,146 +2,151 @@ const express = require("express")
 const app = express()
 const jwt = require("jsonwebtoken")
 const port = 3000
-const db = require("./db/db")
 const bcrypt = require("bcryptjs")
-const cors = require("cors")
+// const cors = require("cors")
 const cookieParser = require("cookie-parser")
 const {google} = require("googleapis")
-
+const supabase = require("./db/db")
 // OauthConfiguration
-const oauth2Client = new google.auth.OAuth2(
-    process.env.GOOGLE_CLIENT_ID, 
-    process.env.GOOGLE_CLIENT_SECRET,
-    "http://localhost:3000/auth/google/callback"
-)
+// const oauth2Client = new google.auth.OAuth2(
+//     process.env.GOOGLE_CLIENT_ID, 
+//     process.env.GOOGLE_CLIENT_SECRET,
+//     "http://localhost:3000/auth/google/callback"
+// )
 
 
-const scopes = [
-    "https://www.googleapis.com/auth/userinfo.email",
-    "https://www.googleapis.com/auth/userinfo.profile"
-]
+// const scopes = [
+//     "https://www.googleapis.com/auth/userinfo.email",
+//     "https://www.googleapis.com/auth/userinfo.profile"
+// ]
 
 
-const authorizaionURL = oauth2Client.generateAuthUrl({
-    access_type : "offline",
-    scope : scopes,
-    include_granted_scopes : true
-})
+// const authorizaionURL = oauth2Client.generateAuthUrl({
+//     access_type : "offline",
+//     scope : scopes,
+//     include_granted_scopes : true
+// })
 
 
-app.get("/auth/google",(req,res)=>{
-    res.redirect(authorizaionURL)
-})
+// app.get("/auth/google",(req,res)=>{
+//     res.redirect(authorizaionURL)
+// })
 
-app.get("/auth/google/callback",async (req,res)=>{
-    try{
-    const {code} = req.query
+// app.get("/auth/google/callback",async (req,res)=>{
+//     try{
+//     const {code} = req.query
 
-    const {tokens} = await oauth2Client.getToken(code)
-    oauth2Client.setCredentials(tokens)
+//     const {tokens} = await oauth2Client.getToken(code)
+//     oauth2Client.setCredentials(tokens)
 
-    const oauth2 = google.oauth2({
-        auth : oauth2Client,
-        version : "v2",
-    })
+//     const oauth2 = google.oauth2({
+//         auth : oauth2Client,
+//         version : "v2",
+//     })
 
-    const {data} = await oauth2.userinfo.get();
-    if(!data || !data.email){
-        return express.json({
-            data : data,
-        })
-    }
-    const email = data.email;
-    const username = data.name
-    
-    db.query("SELECT * FROM authentication WHERE email = ?",[email],async(error,results)=>{
-        if(error){
-            return res.status(500).send({message : "Database error",error : error})
-        }
+//     const {data} = await oauth2.userinfo.get();
+//     if(!data || !data.email){
+//         return express.json({
+//             data : data,
+//         })
+//     }
+//     const email = data.email;
+//     const username = data.name
+   
 
-        let user
-        if(results.length === 0){
-            user = db.query("INSERT INTO authentication (username, email,password) VALUES (?, ?,?)",
-            [username,email,""],
-            (insertError,insertResult)=>{
-                if(insertError){
-                    return res.status(500).send({message : "Failed to insert account"})
-                }
+
+//     db.query("SELECT * FROM authentication WHERE email = ?",[email],async(error,results)=>{
+//         if(error){
+//             return res.status(500).send({message : "Database error",error : error})
+//         }
+
+//         let user
+//         if(results.length === 0){
+//             user = db.query("INSERT INTO authentication (username, email,password) VALUES (?, ?,?)",
+//             [username,email,""],
+//             (insertError,insertResult)=>{
+//                 if(insertError){
+//                     return res.status(500).send({message : "Failed to insert account"})
+//                 }
             
-            user ={
-                id : insertResult.insertId,
-                username,
-                email
-            }
+//             user ={
+//                 id : insertResult.insertId,
+//                 username,
+//                 email
+//             }
             
-            const token = jwt.sign(user, process.env.SECRET_KEY,{expiresIn :"24h" })
+//             const token = jwt.sign(user, process.env.SECRET_KEY,{expiresIn :"24h" })
 
-            res.cookie("token",token,{
-                httpOnly : true,
-                maxAge : 24 * 60 * 60 * 1000,
-                secure : false,
-                sameSite : "strict"          
-             })
-            return res.redirect("http://localhost:5173/dashboard")
-            }
-            )
-        }else{
-            user = results[0]
-            const token = jwt.sign({
-                id : user.id,
-                username : user.username,
-                email : user.email,
-            },process.env.SECRET_KEY, {expiresIn : "24h"})
+//             res.cookie("token",token,{
+//                 httpOnly : true,
+//                 maxAge : 24 * 60 * 60 * 1000,
+//                 secure : false,
+//                 sameSite : "strict"          
+//              })
+//             return res.redirect("http://localhost:5173/dashboard")
+//             }
+//             )
+//         }else{
+//             user = results[0]
+//             const token = jwt.sign({
+//                 id : user.id,
+//                 username : user.username,
+//                 email : user.email,
+//             },process.env.SECRET_KEY, {expiresIn : "24h"})
             
-            res.cookie("token",token,{
-                httpOnly : true,
-                maxAge: 24 * 60 * 60 * 1000,
-                secure : false,
-                sameSite : "strict"
-            })
-            return res.redirect("http://localhost:5173/dashboard")
-        }
-    })
-    }catch(error){
-        return res.status(500).send({message : "Internal server error",error})
-    }
-})
+//             res.cookie("token",token,{
+//                 httpOnly : true,
+//                 maxAge: 24 * 60 * 60 * 1000,
+//                 secure : false,
+//                 sameSite : "strict"
+//             })
+//             return res.redirect("http://localhost:5173/dashboard")
+//         }
+//     })
+//     }catch(error){
+//         return res.status(500).send({message : "Internal server error",error})
+//     }
+// })
 
 
-app.use(cors({
-    origin: 'http://localhost:5173',
-    credentials : true
-}))
-const session = require("express-session")
-const passport = require("passport")
+// app.use(cors({
+//     origin: 'http://localhost:5173',
+//     credentials : true
+// }))
+// const session = require("express-session")
+// const passport = require("passport")
 require("dotenv").config()
 
 // middleware
 app.use(express.json())
 app.use(cookieParser())
 
-app.use(session({
-    secret : process.env.SECRET_KEY,
-    resave : false,
-    saveUninitialized : true
-}))
+// app.use(session({
+//     secret : process.env.SECRET_KEY,
+//     resave : false,
+//     saveUninitialized : true
+// }))
 
 
 // route
-app.get("/",(req,res)=>{
-    try{
-        db.query("SELECT * FROM authentication",(error,result)=>{
-            if(error){
-                const response = res.status(400).send({message : "Failed to sync data",error : error})
-                return response
-            }
+app.get("/",async (req,res)=>{
+try{
+    const {data,error} = await supabase
+    .from("authentication")
+    .select("*")
 
-            const response = res.status(200).send({status : "success fetching data",message : "success load the data", data : result})
-            return response
-        })
-    }catch(error){
-        return res.status(500).send({status : "Internal server error",message : "something wrong try again"})
+    if(error){
+        return res.status(500).send({message : "Failed"})
     }
+
+    if(data.length === 0){
+        return res.status(404).send({users : "users not found! its empty lets add it"})
+    }
+
+    return res.status(200).send({message : "users list",data:data})
+}catch(error){
+    return res.status(500).send({status : "Internal server error",message : "something wrong try again"})
+}
 })
 
 const formValidationRegister = (req,res,next)=>{
@@ -184,30 +189,28 @@ const formValidationRegister = (req,res,next)=>{
 
 app.post("/register",formValidationRegister,async (req,res)=>{
     const {username,email,password} = req.body
+    if(!username || !email || !password){
+        return res.status(400).send({status : "Bad Request!"})
+    }
     const hashedPassword = await bcrypt.hash(password,10)
     try{
-        db.query("INSERT INTO authentication (username,email,password) VALUES (?, ?, ?)",[username,email,hashedPassword],(error,result)=>{
-            if(error){
-                const response = res.status(400).send({message : "Failed to sync data",error : error})
-                return response
-            }
+        const {data,error} = await supabase
+        .from("authentication")
+        .insert({username,email,password : hashedPassword})
+        .select()
+        console.log(error)
+        console.log(data)
+        if(error){
+            res.status(400).send({status : "bad request",error : error})
+        }
 
-            const response = res.status(200).send({
-                message : "success register as an use our website!",
-                data : {
-                    username : username,
-                    email :email
-                }    
-            })
-            return response
-
-        })
+        return res.status(200).send({status : "Register completed!",data})
     } catch(error){
         return res.status(500).send({status : "Internal server error",message : "something wrong try again"})       
     }
 })
 
-app.post("/login",(req,res)=>{
+app.post("/login",async (req,res)=>{
     res.header("Access-Control-Allow-Origin",'http://localhost:5173')
     try{
         const {username,password} = req.body;
@@ -217,28 +220,24 @@ app.post("/login",(req,res)=>{
             })
         }
       
-        db.query("SELECT * FROM authentication WHERE username = ?",[username],async(error,result)=>{
-            if(error || result.length === 0){
-                const response = res.status(400).send({
-                    status : "Bad Request!",
-                    message : "Failed to login, the username not listed on our system"
-                })
-                return response
-            }
+        const {data,error} = await supabase 
+        .from('authentication')
+        .select("*")
+        .eq("username",username)
+        .single()
 
-            const user = result[0]
-            const isMatch = await bcrypt.compare(password,user.password)
-            if(!isMatch){
-                const response = res.status(400).send({
-                    status : "Invalid fill!",
-                    message : "Failed to login, the password is wrong"    
-                })
-                return response
-            }
-            const token = jwt.sign({
-                id : user.id,
-                username : user.username,
-                email : user.email
+        if(error || !data){
+            return res.status(401).send({message : "Invalid username or pasword"})
+        }
+        
+        const isMatch = await bcrypt.compare(password, data.password)
+        if(!isMatch){
+            return res.status(401).send({message : "Pasword not match Invalid!"})
+        }
+        const token = jwt.sign({
+                id : data.id,
+                username : data.username,
+                email : data.email
             },process.env.SECRET_KEY,{expiresIn : "24h"})
            
             res.cookie('token',token,{
@@ -251,9 +250,8 @@ app.post("/login",(req,res)=>{
             res.send({
                 token : token
             })
-        })
-    } catch(error){
-        return res.status(500).send({status : "Internal server error",message : "something wrong try again"})       
+        }catch(error){
+        return res.status(500).send({status : "Internal server error",message : "something wrong try again",error})       
     }
 })
 
@@ -275,182 +273,239 @@ const authenticationValidation = (req,res,next)=>{
 
 
 
-app.get("/dashboard",authenticationValidation,(req,res)=>{
-    res.header("Access-Control-Allow-Origin",'http://localhost:5173')
+app.get("/dashboard",authenticationValidation,async (req,res)=>{
+    try{
+
+
     const userId = req.user.id
-    db.query(`
-        SELECT tasks.id, tasks.title, tasks.description, tasks.status, tasks.created_at, tasks.updated_at FROM tasks JOIN authentication ON tasks.user_id = authentication.id WHERE authentication.id = ? `,[userId],
-    (error,result)=>{
-        if(error){
-            return res.status(400).send({message : "Failed to fetch tasks",error})
-        }
-        return res.status(200).send({message : "success fetching data",data : result})
-    })
+    const {data,error} = await supabase
+    .from("tasks")
+    .select("*")
+    .eq("user_id",userId)
+
+    if(error){
+        return res.status(500).send({
+            message : "Failed to fetch tasks",
+            error
+        })
+    }
+    return res.status(200).send({message : "sucesssfully fetched tasks",data})
+    }catch(error){
+        return res.status(500).send({
+            message : "failed to fetch task",
+            error
+        })
+    }
 })
 
-app.post("/dashboard/add",authenticationValidation,(req,res)=>{
+app.post("/dashboard/add",authenticationValidation,async (req,res)=>{
     const userId = req.user.id;
     const {title,description,status} = req.body
     const created_at = new Date();
     const updated_at = new Date();
 
-    db.query(`
-        INSERT INTO tasks(title,description,status,created_at,updated_at,user_id) VALUES (?, ?, ?, ?, ?,?)
-        `,[title,description,status,created_at,updated_at,userId],(error,result) =>{
-            if(error){
-                return res.status(400).send({message : "Failed to add task",error:error})
-            }
-            return res.status(201).send({
-                message : "Task successfully added!",
-                data : {
-                    id : result.insertId,
-                    title, 
-                    description,
-                    status,
-                    created_at,
-                    updated_at,
-                    user_id : userId
-                }
-            })
-        }
+    const {data,error} = await supabase
+    .from("tasks")
+    .insert([{title,description,status,created_at,updated_at,user_id : userId}])
+    .select() 
 
-    )
+    if(error){
+        return res.status(400).send({message : "Failed to add tasks",error})
+    }
+
+    return res.status(201).send({
+        message : "task successfully added!",
+        data : data[0]
+    })
  })
 
- app.get("/dashboard/task/:id",authenticationValidation,(req,res)=>{
+ app.get("/dashboard/task/:id",authenticationValidation,async (req,res)=>{
     const id = req.params.id
     const useId = req.user.id
-    db.query("SELECT * FROM tasks WHERE id = ? AND user_id = ?",[id,useId],(error,results)=>{
-        if(error){
-            return res.status(500).send({message : "Internal server error please contact developer and try again"})
-        }
 
-        return res.status(200).send({message : "success fetching data",data : results})
-    })
- })
-
- app.put("/dashboard/edit/:id",authenticationValidation,(req,res)=>{
-    const id = req.params.id
-    const {title,description,status} = req.body;
-    const updatedAt = new Date()
-    const userId = req.user.id
-    db.query("UPDATE tasks SET title = ?, description = ?, status = ?, updated_at = ? WHERE id = ? AND user_id = ?",[title,description,status,updatedAt,id,userId],(error,results)=>{
-        if(error){
-            console.error("Error Updating Data",error)
-            return res.status(500).send({message : "Failed to updated task"})
-        }
-        return res.status(200).send({message : "Task updated successfully",data : results})
-    })
- })
-
-app.patch("/dashboard/task/status/in-progress/:id",authenticationValidation,(req,res)=>{
-    try{
-
-
-    const id = req.params.id
-    const status ='in-progress'
-
-    const updateAt = new Date()
-    const userId = req.user.id
-    db.query("UPDATE tasks SET status = ?, updated_at = ? WHERE id = ? AND user_id = ?",[status,updateAt,id,userId],(error,results)=>{
-        if(error){
-            return res.status(500).send({message : "Error change status!",error})
-        }
-
-        return res.status(200).send({message : "Success change status!",results : results})
-    })
-    }catch(error){
-        return res.status(500).send({message : "failed change the status!",error})
+    const {data,error} = await supabase
+    .from("tasks")
+    .select("*")
+    .eq("id",id)
+    .eq("user_id",useId)
+    
+    if(error){
+        return res.status(400).send({message : "Failed load task!",error})
     }
-})
 
-app.patch("/dashboard/task/status/success/:id",authenticationValidation,(req,res)=>{
+    return res.status(200).send({message : "Success load the task!",data})
+ })
+
+ app.put("/dashboard/edit/:id", authenticationValidation, async (req, res) => {
+    const id = req.params.id;
+    const { title, description, status } = req.body;
+    const updatedAt = new Date();
+    const userId = req.user.id;
+  
+    const { data, error } = await supabase
+      .from("tasks")
+      .update({
+        title,
+        description,
+        status,
+        updated_at: updatedAt
+      })
+      .eq("id", id)
+      .eq("user_id", userId)
+      .select();
+  
+    if (error) {
+      console.error("Error updating task:", error); 
+      return res.status(400).send({ message: "Failed to update task", error });
+    }
+  
+    if (!data || data.length === 0) {
+      return res.status(404).send({ message: "Task not found or not authorized" });
+    }
+  
+    return res.status(200).send({
+      message: "Task updated successfully",
+      data: data[0]
+    });
+  });
+  
+app.patch("/dashboard/task/status/in-progress/:id",authenticationValidation,async (req,res)=>{
     try{
-        const status = 'completed'
         const id = req.params.id
-    
-        const updateAt = new Date()
         const userId = req.user.id
-        db.query("UPDATE tasks SET status = ?, updated_at = ?  WHERE id = ?  AND user_id = ?",[status,updateAt,id,userId],(error,results)=>{
-            if(error){
-                return res.status(500).send({message: "Error change status!",error})
-            }
-            return res.status(200).send({message : "success change status",results : results})
-        })
-    
-    }catch(error){
-        return res.status(500).send({message : "failed change the status!",error})
-    }
+        const status = "In-progress"
+        const updateAt = new Date()
+   
+        const {data,error} = await supabase
+       .from("tasks")
+       .update({
+           updated_at :updateAt,
+           status
+       })
+       .eq("id",id)
+       .eq("user_id",userId)
+   
+        if(error){
+            return res.status(400).send({message : "Failed to change status",error})
+        }
+        
+        return res.status(200).send({message : "Successfully to change status",data})
+   }catch(error){
+        return res.status(500).send({message : "Error change the status",error})
+       }
+        
 })
 
-app.patch("/dashboard/task/status/pending/:id",authenticationValidation,(req,res)=>{
+app.patch("/dashboard/task/status/success/:id",authenticationValidation,async(req,res)=>{
+    try{
+        const id = req.params.id
+        const userId = req.user.id
+        const status = "Success"
+        const updateAt = new Date()
+    
+        const {data,error} = await supabase
+        .from("tasks")
+        .update({
+            updated_at :updateAt,
+            status
+        })
+        .eq("id",id)
+        .eq("user_id",userId)
+    
+        if(error){
+            return res.status(400).send({message : "Failed to change status",error})
+        }
+    
+        return res.status(200).send({message : "Successfully to change status",data})
+       }catch(error){
+        return res.status(500).send({message : "Error change the status",error})
+       }
+})
+
+app.patch("/dashboard/task/status/pending/:id",authenticationValidation,async (req,res)=>{
    try{
     const id = req.params.id
     const userId = req.user.id
-    const status = "pending"
+    const status = "Pending"
     const updateAt = new Date()
 
-    db.query("UPDATE tasks SET status = ?, updated_at = ? WHERE id = ? AND user_id = ?",[status,updateAt,id,userId],(error,results)=>{
-        if(error){
-            return res.status(202).send({message : "failed to change the status",error})
-        }
-
-        return res.status(200).send({message : "Success to change the status", data : results})
+    const {data,error} = await supabase
+    .from("tasks")
+    .update({
+        updated_at :updateAt,
+        status
     })
+    .eq("id",id)
+    .eq("user_id",userId)
+
+    if(error){
+        return res.status(400).send({message : "Failed to change status",error})
+    }
+
+    return res.status(200).send({message : "Successfully to change status",data})
    }catch(error){
     return res.status(500).send({message : "Error change the status",error})
    }
 })
 
 
- app.delete("/dashboard/delete/:id",authenticationValidation,(req,res)=>{
+ app.delete("/dashboard/delete/:id",authenticationValidation, async (req,res)=>{
     const userId = req.user.id
     const id = req.params.id
-    db.query('DELETE FROM tasks WHERE id = ? AND user_id = ?',[id,userId],(error,result)=>{
-        if(error){
-            return res.status(400).send({message : "Failed to delete task"})
-        }
-        if(result.affectedRows === 0){
-            return res.status(404).send({message : "Task not found!"})
-        }
-        return res.status(200).send({message : "Tasks successfully deleted"})
+    
+    const {data,error} = await supabase
+    .from("tasks")
+    .delete()
+    .eq("id",id)
+    .eq("user_id",userId)
+
+    if (error) {
+        return res.status(400).send({ message: "Failed to delete task", error });
+      }
+    
+    if (!data || data.length === 0) {
+        return res.status(404).send({ message: "Task not found!" });
+    }
+    
+      return res.status(200).send({ message: "Task successfully deleted", data });
     })
- })
 
 
-app.get("/dashboard/profile",authenticationValidation,(req,res)=>{
+app.get("/dashboard/profile",authenticationValidation,async (req,res)=>{
     const userId = req.user.id
-    db.query("SELECT * FROM profile WHERE user_id = ?",[userId],(error,result)=>{
-        if(error){
-            return res.status(400).send({error})
-        }
 
-        if(result){
-            return res.status(200).send({
-                message : "data find!",
-                result  
-            })
-        }
-    })
+    const {data,error} = await supabase
+    .from("profile")
+    .select("*")
+    .eq("user_id",userId)
+
+    if(error){
+        return res.status(400).send({status : "bad request"})
+    }
+
+    return res.status(200).send({message : "Successfully",data})
+
 })
 
-app.post("/dashboard/profile",authenticationValidation,(req,res)=>{
+app.put("/dashboard/profile",authenticationValidation,async (req,res)=>{
     const {telepon,tanggalLahir,jenisKelamin,fotoProfile} = req.body;
     const userId = req.user.id 
-    db.query("UPDATE profile SET telepon =?,tanggal_lahir = ?,jenis_kelamin = ?,foto_profile = ? WHERE user_id = ?",
-        [telepon,tanggalLahir,jenisKelamin,fotoProfile,userId],(error,result)=>{
-            if(error){
-                return res.status(400).send({
-                    message : "Failed to update profile!",
-                    error
-                })
-            }
-            return res.status(200).send({
-                message : "Success update the data",
-                result
-            })
-        }
-     )
+ 
+    const {data,error} = await supabase
+    .from("profile")
+    .update({
+        telepon,
+        "tanggal_lahir":tanggalLahir,
+        "jenis_kelamin":jenisKelamin,
+        "foto_profile":fotoProfile})
+    .eq("user_id",userId)
+    .select()
+
+    if(error){
+        return res.status(400).send({message : "Failed to change data"})
+    }
+
+    return res.status(200).send({message : "Successfully data changed",data})
 })
 
 

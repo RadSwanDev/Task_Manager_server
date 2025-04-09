@@ -1,18 +1,11 @@
-const mysql = require("mysql2")
+const { createClient } = require("@supabase/supabase-js")
+
 require("dotenv").config()
-const db = mysql.createConnection({
-    host : process.env.HOST_DATABASE,
-    user : process.env.USERNAME_DATABASE,
-    password : process.env.PASSWORD_DATABASE,
-    database : process.env.USE_DATABASE
-})
 
-db.connect((error,success)=>{
-    if(error){
-        console.log("Failed to connect database")
-    }
 
-    console.log("success to connect database")
-})
+const supabaseURL = process.env.SUPABASE_URL
+const supabaseKey = process.env.SUPABASE_KEY
 
-module.exports = db
+const supabase = createClient(supabaseURL,supabaseKey)
+
+module.exports = supabase
