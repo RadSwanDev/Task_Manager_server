@@ -3,7 +3,7 @@ const app = express()
 const jwt = require("jsonwebtoken")
 const port = 3000
 const bcrypt = require("bcryptjs")
-// const cors = require("cors")
+const cors = require("cors")
 const cookieParser = require("cookie-parser")
 const {google} = require("googleapis")
 const supabase = require("./db/db")
@@ -109,10 +109,10 @@ const supabase = require("./db/db")
 // })
 
 
-// app.use(cors({
-//     origin: 'http://localhost:5173',
-//     credentials : true
-// }))
+app.use(cors({
+    origin: 'http://localhost:5173',
+    credentials : true
+}))
 // const session = require("express-session")
 // const passport = require("passport")
 require("dotenv").config()
@@ -198,8 +198,6 @@ app.post("/register",formValidationRegister,async (req,res)=>{
         .from("authentication")
         .insert({username,email,password : hashedPassword})
         .select()
-        console.log(error)
-        console.log(data)
         if(error){
             res.status(400).send({status : "bad request",error : error})
         }
@@ -248,6 +246,7 @@ app.post("/login",async (req,res)=>{
             })
 
             res.send({
+                message : `Success login for ${data.username}, Welcome back!`,
                 token : token
             })
         }catch(error){
@@ -275,8 +274,6 @@ const authenticationValidation = (req,res,next)=>{
 
 app.get("/dashboard",authenticationValidation,async (req,res)=>{
     try{
-
-
     const userId = req.user.id
     const {data,error} = await supabase
     .from("tasks")
@@ -294,7 +291,7 @@ app.get("/dashboard",authenticationValidation,async (req,res)=>{
         return res.status(500).send({
             message : "failed to fetch task",
             error
-        })
+    })
     }
 })
 
@@ -362,7 +359,6 @@ app.post("/dashboard/add",authenticationValidation,async (req,res)=>{
     if (!data || data.length === 0) {
       return res.status(404).send({ message: "Task not found or not authorized" });
     }
-  
     return res.status(200).send({
       message: "Task updated successfully",
       data: data[0]
@@ -384,7 +380,8 @@ app.patch("/dashboard/task/status/in-progress/:id",authenticationValidation,asyn
        })
        .eq("id",id)
        .eq("user_id",userId)
-   
+       console.log(data)
+       console.log(error)   
         if(error){
             return res.status(400).send({message : "Failed to change status",error})
         }
@@ -400,7 +397,7 @@ app.patch("/dashboard/task/status/success/:id",authenticationValidation,async(re
     try{
         const id = req.params.id
         const userId = req.user.id
-        const status = "Success"
+        const status = "Completed"
         const updateAt = new Date()
     
         const {data,error} = await supabase
@@ -411,7 +408,6 @@ app.patch("/dashboard/task/status/success/:id",authenticationValidation,async(re
         })
         .eq("id",id)
         .eq("user_id",userId)
-    
         if(error){
             return res.status(400).send({message : "Failed to change status",error})
         }
@@ -449,7 +445,7 @@ app.patch("/dashboard/task/status/pending/:id",authenticationValidation,async (r
 })
 
 
- app.delete("/dashboard/delete/:id",authenticationValidation, async (req,res)=>{
+app.delete("/dashboard/delete/:id",authenticationValidation, async (req,res)=>{
     const userId = req.user.id
     const id = req.params.id
     
@@ -458,6 +454,9 @@ app.patch("/dashboard/task/status/pending/:id",authenticationValidation,async (r
     .delete()
     .eq("id",id)
     .eq("user_id",userId)
+    .select()
+    console.log(data)
+    console.log(error)
 
     if (error) {
         return res.status(400).send({ message: "Failed to delete task", error });
@@ -466,8 +465,12 @@ app.patch("/dashboard/task/status/pending/:id",authenticationValidation,async (r
     if (!data || data.length === 0) {
         return res.status(404).send({ message: "Task not found!" });
     }
+
+    if(data){
+        return res.status(200).send({ message: "Task successfully deleted", data });
     
-      return res.status(200).send({ message: "Task successfully deleted", data });
+    }
+
     })
 
 
@@ -478,7 +481,6 @@ app.get("/dashboard/profile",authenticationValidation,async (req,res)=>{
     .from("profile")
     .select("*")
     .eq("user_id",userId)
-
     if(error){
         return res.status(400).send({status : "bad request"})
     }
